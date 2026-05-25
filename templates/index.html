@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+
+    <title>Optimizator Rute Agricole</title>
+
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet/dist/leaflet.css"
+    >
+
+    <script
+        src="https://unpkg.com/leaflet/dist/leaflet.js">
+    </script>
+</head>
+
+<body>
+
+<h1>Optimizator Rute Agricole</h1>
+
+<p>
+Primul click = punct start
+<br>
+Restul clickurilor = puncte de lucru
+</p>
+
+<div
+    id="map"
+    style="height:600px;">
+</div>
+
+<br>
+
+<button onclick="calcRoute()">
+    Calculeaza ruta
+</button>
+
+<button onclick="clearMap()">
+    Reset
+</button>
+
+<h3>Rezultat</h3>
+
+<p id="distance">
+Distanta:
+</p>
+
+<p id="time">
+Timp:
+</p>
+
+<p id="order">
+Ordine:
+</p>
+
+<script>
+
+let map =
+    L.map('map')
+    .setView(
+        [47.66,23.58],
+        8
+    );
+
+L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+).addTo(map);
+
+let startPoint = null;
+
+let workPoints = [];
+
+let markers = [];
+
+let polyline = null;
+
+
+
+map.on(
+    'click',
+    function(e){
+
+        let lat = e.latlng.lat;
+        let lng = e.latlng.lng;
+
+        if(startPoint === null){
+
+            startPoint = {
+                lat:lat,
+                lng:lng
+            };
+
+            let marker =
+                L.marker(
+                    [lat,lng]
+                )
+                .addTo(map)
+                .bindPopup("START");
+
+            markers.push(marker);
+
+        }
+        else{
+
+            let point = {
+                lat:lat,
+                lng:lng
+            };
+
+            workPoints.push(point);
+
+            let marker =
+                L.marker(
+                    [lat,lng]
+                )
+                .addTo(map)
+                .bindPopup(
+                    "Punct "
+                    + workPoints.length
+                );
+
+            markers.push(marker);
+        }
+
+    }
+);
+
+
+
+function calcRoute(){
+
+    if(startPoint === null){
+
+        alert(
+            "Selecteaza punctul de start"
+        );
+
+        return;
+    }
+
+    if(workPoints.length === 0){
+
+        alert(
+            "Adauga puncte de lucru"
+        );
+
+        return;
+    }
+
+    fetch(
+        '/route',
+        {
+            method:'POST',
+
+            headers:{
+                'Content-Type':
+                'application/json'
+            },
+
+            body:
+            JSON.stringify(
+                {
+                    start:startPoint,
+                    work_points:workPoints
+                }
+            )
+        }
+    )
+
+    .then(
+        response =>
+        response.json()
+    )
+
+    .then(
+        data => {
+
+            console.log(data);
+
+            if(
+                data.route.length === 0
+            ){
+                alert(
+                    "Nu exista ruta"
+                );
+                return;
+            }
+
+            if(polyline){
+
+                map.removeLayer(
+                    polyline
+                );
+            }
+
+            polyline =
+                L.polyline(
+                    data.route,
+                    {
+                        color:"green",
+                        weight:5
+                    }
+                )
+                .addTo(map);
+
+            map.fitBounds(
+                polyline.getBounds()
+            );
+
+            document
+                .getElementById(
+                    "distance"
+                )
+                .innerText =
+                "Distanta: "
+                + data.distance
+                + " km";
+
+            document
+                .getElementById(
+                    "time"
+                )
+                .innerText =
+                "Timp estimat: "
+                + data.time
+                + " ore";
+
+            let textOrdine =
+                "Ordine optima: ";
+
+            data.order.forEach(
+                (
+                    p,
+                    index
+                ) => {
+
+                    textOrdine +=
+                        (index + 1)
+                        + " ";
+
+                }
+            );
+
+            document
+                .getElementById(
+                    "order"
+                )
+                .innerText =
+                textOrdine;
+        }
+    );
+}
+
+
+
+function clearMap(){
+
+    startPoint = null;
+
+    workPoints = [];
+
+    markers.forEach(
+        marker =>
+        map.removeLayer(
+            marker
+        )
+    );
+
+    markers = [];
+
+    if(polyline){
+
+        map.removeLayer(
+            polyline
+        );
+
+        polyline = null;
+    }
+
+    document
+        .getElementById(
+            "distance"
+        )
+        .innerText =
+        "Distanta:";
+
+    document
+        .getElementById(
+            "time"
+        )
+        .innerText =
+        "Timp:";
+
+    document
+        .getElementById(
+            "order"
+        )
+        .innerText =
+        "Ordine:";
+}
+
+</script>
+
+</body>
+</html>
